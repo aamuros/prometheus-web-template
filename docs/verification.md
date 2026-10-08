@@ -1,107 +1,166 @@
 # Template verification
 
-Verified on 2026-10-08 with Node.js 24.19.0 and pnpm 12.10.1 on macOS arm64.
+Version 1.0 stabilization verified on 2026-10-08 with Node.js 24.19.0 and pnpm
+12.10.1 on macOS arm64, on branch `chore/v1-release-readiness`. The inspected
+GitHub `main` commit was `6cfc50a24622c9572b27be9a817d379685c07100`.
+
+## Findings verified against GitHub
+
+Read-only GitHub API checks at the initial inspection established the following;
+no remote repository settings were changed.
+
+| Finding                | Current evidence                                                                                                                                                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Template mode          | Already enabled: repository API returned `is_template: true`.                                                                                                                                                                  |
+| Default branch         | `main`.                                                                                                                                                                                                                        |
+| Branch protection      | Absent: `protected: false`, protection endpoint returned `404 Branch not protected`, and repository rulesets were empty.                                                                                                       |
+| Production environment | Absent: the environments endpoint returned zero environments.                                                                                                                                                                  |
+| Existing CI            | The [latest main run](https://github.com/aamuros/prometheus-web-template/actions/runs/37743522231) succeeded. Its `check` job completed frozen installation, `pnpm check`, and the high/critical audit successfully on GitHub. |
+| Cloud deployment       | Not verified. No deployment workflow run appeared in the five-run query, but workflow history alone does not establish whether a manual cloud deployment exists.                                                               |
+
+Commands used: `gh auth status`, `gh api repos/aamuros/prometheus-web-template`,
+the repository's `branches/main`, `branches/main/protection`, `rulesets`, and
+`environments` API endpoints, `gh run list --limit 5`, and the successful run's
+`actions/runs/37743522231/jobs` endpoint. Repository access permitted reading all
+these settings; the branch-protection 404 indicates missing protection.
 
 ## Independent application check
 
-Copied only the 40 source, configuration, documentation, and lockfile files into a fresh temporary directory. Neither `node_modules` nor build artifacts were copied. Installed from the lockfile there, ran all checks, and exercised development and production preview from that copy. This report was added afterward, bringing the delivered source/configuration file count to 41.
+Copied the 43 tracked and new source/configuration/documentation files into
+`/private/tmp/prometheus-v1-c9h2br2j`, without `.git`, dependencies, build outputs,
+or local environment files. This was an isolated clean-copy test, **not GitHub
+template generation**. No repository was created and no deployment was made.
 
-The frozen installation used pnpm's normal package store cache and preserved the lockfile byte-for-byte. There are no dependencies on the original application directory or template repository. No database, external service configuration, or application credentials were supplied. No cloud deployment was performed.
+In the copy, renamed package name/description, Worker name, HTML title/description,
+and visible application name. The generated Worker configuration retained
+`prometheus-v1-smoke`, and the built HTML and JavaScript contained the renamed
+application title. The frontend assets and Worker bundle were built together;
+the generated Worker configuration pointed to `../client` for its assets.
 
-## Results
+The frozen install reused pnpm's normal package store: 290 packages reused, zero
+downloaded. The lockfile remained byte-for-byte unchanged (SHA-256
+`a91a776ed776dddf661b3855ab692b7f3626b311f0459b23384282c0d12c6b15`).
+The copy started without `.env`, `.dev.vars`, or external credentials. Reviewed
+source and configuration contain no account-specific credentials, local package
+links, runtime dependency on the original template, or Atlas integration.
 
-| Check                                                   | Result and evidence                                                                                                                                                                                                                  |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm install --frozen-lockfile --reporter=append-only` | Passed in the clean copy; exact direct versions and unchanged lockfile verified.                                                                                                                                                     |
-| `pnpm typecheck`                                        | Passed frontend, Cloudflare Worker, and tooling/test configurations.                                                                                                                                                                 |
-| `pnpm lint`                                             | Passed with zero permitted warnings; browser imports of Worker modules are prohibited.                                                                                                                                               |
-| `pnpm format:check`                                     | Passed.                                                                                                                                                                                                                              |
-| `pnpm test`                                             | 14 tests passed in 2 files: 8 API cases and 6 frontend cases.                                                                                                                                                                        |
-| `pnpm build`                                            | Passed; separate client and Worker output produced by the official Cloudflare plugin.                                                                                                                                                |
-| `pnpm check`                                            | Passed in the isolated copy, including all five checks above.                                                                                                                                                                        |
-| `pnpm audit --audit-level=high`                         | Passed; reported no known vulnerabilities after the patched `sharp` override.                                                                                                                                                        |
-| `pnpm dev --port 5175 --strictPort`                     | Started locally; Chromium rendered **Application ready** and **API connected**. The actual browser request to `/api/health` returned 200.                                                                                            |
-| Development SPA/API routing                             | Direct `/missing` navigation rendered **Page not found**. API navigation with `Sec-Fetch-Mode: navigate` returned health JSON 200 and unknown-route JSON 404.                                                                        |
-| `pnpm preview --port 4175 --strictPort`                 | Rebuilt and started the production application in local workerd. Chromium rendered the home page and received health JSON 200.                                                                                                       |
-| Production SPA fallback                                 | Direct `/missing` navigation rendered the not-found view; clicking **Return home** restored the working home page without a full navigation.                                                                                         |
-| Production API routing                                  | Direct health navigation returned `200 {"status":"ok"}`; unknown API navigation returned `404 {"error":"Not found"}`. `POST /api/health` returned 405 with `Allow: GET, HEAD`.                                                       |
-| Production security headers                             | Static HTML included CSP, nosniff, frame denial, no-referrer, and restricted permissions. API responses included security headers and `Cache-Control: no-store`.                                                                     |
-| Production browser console                              | Zero errors and zero warnings, including no CSP violations.                                                                                                                                                                          |
-| Repository hygiene                                      | Environment/secret files, dependencies, and build artifacts are ignored; example files remain tracked. No absolute development paths, local package links, account identifiers, or credentials are configured in application source. |
+## Executed checks
 
-API tests cover health payload and headers, HEAD, unsupported methods, missing routes, safe unexpected errors, deliberate HTTP error statuses, and redacted request logs. Frontend tests cover the actual health contract, not-found handling, failed requests, invalid payloads, network failures, and rendering errors. Browser verification used an external Playwright CLI; Playwright is not a project dependency and no E2E framework is installed.
+The mandatory checks below ran in the renamed clean copy. Server commands also
+used `WRANGLER_SEND_METRICS=false` and `WRANGLER_LOG_PATH=.wrangler/logs` to keep
+diagnostic logs local. Development and preview ran outside the execution sandbox
+with approval after the sandbox blocked their listening port.
 
-## Failures found and resolved
+| Command/check                                           | Actual outcome                                                                                                                                |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm install --frozen-lockfile --reporter=append-only` | Passed with the pinned package manager; lockfile unchanged.                                                                                   |
+| `pnpm check`                                            | Passed strict frontend/Worker/tooling typechecks, ESLint with zero warnings, formatting, all 14 tests in two files, and the production build. |
+| `pnpm audit --audit-level=high`                         | Passed: no known vulnerabilities reported.                                                                                                    |
+| `pnpm dev --port 5175 --strictPort`                     | Started the frontend and local Worker without application credentials; HTTP routing checks below passed.                                      |
+| `pnpm preview --port 4175 --strictPort`                 | Rebuilt and started the production application in workerd; HTTP routing, assets, and headers below passed.                                    |
+| `pnpm why sharp` and installed Miniflare metadata       | Confirmed `sharp@0.35.5` is used, while Miniflare `5.20261006.0-alpha` still pins `0.35.4`; retain the security override.                     |
 
-- Initial strict typecheck rejected an explicit `undefined` router history; the router now defaults to a browser history and accepts an explicit memory history for tests.
-- Initial React refresh lint failures were resolved by exporting the route components alongside the explicitly allowed `Route` export.
-- The initial dependency audit found a high-severity advisory in transitive `sharp` 0.35.4. The pnpm override pins patched 0.35.5; subsequent builds, preview, and audits passed.
-- The environment initially lacked the `pnpm` shim; Corepack was enabled. This is included in the setup instructions.
-- A sandboxed build could not write Wrangler's user-level diagnostic log, and an isolated audit encountered sandbox DNS restrictions. Authorized runs outside that sandbox restriction passed. These were execution-environment issues, not application failures.
+HTTP checks used `curl -sS --max-time 15 -D -` with
+`Sec-Fetch-Mode: navigate` and `Accept: text/html` against both local servers,
+and assertions on status, content type, and body:
 
-No tests or mandatory checks remain failing. The browser and the development/preview processes created for verification were stopped afterward.
+- `/` and `/missing`: HTML 200, the renamed title and React mount point, and
+  identical SPA shells. React rendering and the not-found view passed in Vitest;
+  HTTP shell checks do not prove browser rendering.
+- `/api/health`: JSON 200 with `{"status":"ok"}`.
+- `/api` and `/api/missing`: JSON 404 with `{"error":"Not found"}`, even when
+  requested as browser navigations; neither received SPA HTML.
+- Production preview additionally returned 405 and `Allow: GET, HEAD` for
+  `POST /api/health`, and 200 for `HEAD /api/health`.
+- Both built JavaScript and CSS URLs served 200 with their expected content types.
+- Production static and API responses included CSP, nosniff, frame denial,
+  no-referrer, and permissions headers. API responses also had
+  `Cache-Control: no-store`.
 
-## Installed versions
+Existing tests cover health/headers, HEAD, unsupported methods, unknown APIs,
+safe exception handling, redacted logs, React rendering with the Hono contract,
+unknown client routes, request/contract/network failures, and rendering errors.
+No additional browser dependency or duplicate unit tests were added. Both
+verification servers were stopped after use.
 
-Runtime dependencies: React/React DOM 19.3.0, TanStack Router 1.170.41, Hono 4.13.13, clsx 2.1.1, and tailwind-merge 3.7.0.
+## Failures encountered and resolved
 
-Build/runtime tooling: Vite 8.3.3, React plugin 6.1.2, Cloudflare Vite plugin 1.63.0, Wrangler 4.148.0, Workers types 5.20261008.1, and Tailwind/Vite integration 4.3.3.
+- The first clean-copy `pnpm check` stopped at formatting: the longer renamed
+  HTML description needed wrapping. `pnpm exec prettier --write index.html`
+  fixed the copy, then the full check passed. The README now includes formatting
+  after renaming. This was a renamed fixture issue, not an application defect.
+- Sandboxed development and preview starts failed with `listen EPERM` on the
+  Cloudflare inspector port `9229`. Approved runs outside the sandbox passed;
+  application configuration was not weakened.
+- The login shell emitted a sandbox permission warning while creating an fnm
+  multishell symlink. Subsequent commands used a non-login shell with the same
+  verified Node/pnpm versions.
 
-Verification tooling: TypeScript 6.0.3, ESLint 10.12.0, TypeScript ESLint 8.71.1, Prettier 3.9.9, Vitest 5.0.3, Testing Library, jsdom, and the pinned React ESLint plugins and type packages. All 30 direct packages and the transitive dependency graph are recorded in `package.json` and `pnpm-lock.yaml`. shadcn/ui configuration and utilities are provided without installing an unused component collection.
+No mandatory check remains failing. This report and the final README edit were
+completed after the clean-copy runtime test. Final `pnpm format:check` and
+`git diff --check` passed in the original repository to validate those
+documentation changes.
 
-## Files delivered
+Before merging, `pnpm install --frozen-lockfile --reporter=append-only`,
+`pnpm check`, `pnpm audit --audit-level=high`, and `git diff --check` were also
+rerun in the original repository. All passed, including all 14 tests and both
+production bundles; the audit reported no known vulnerabilities.
 
-```text
-.dev.vars.example
-.env.example
-.github/workflows/ci.yml
-.github/workflows/deploy.yml
-.gitignore
-.node-version
-.prettierignore
-.prettierrc.json
-README.md
-components.json
-docs/architecture.md
-docs/conventions.md
-docs/verification.md
-eslint.config.js
-index.html
-package.json
-pnpm-lock.yaml
-pnpm-workspace.yaml
-public/_headers
-shared/api.ts
-src/app/main.tsx
-src/app/router.ts
-src/components/not-found.tsx
-src/components/route-error.tsx
-src/lib/api.ts
-src/lib/utils.ts
-src/routes/index.tsx
-src/routes/root.tsx
-src/styles/globals.css
-tests/api.test.ts
-tests/frontend.test.tsx
-tests/setup.ts
-tsconfig.app.json
-tsconfig.json
-tsconfig.tools.json
-tsconfig.worker.json
-vite.config.ts
-vitest.config.ts
-worker/app.ts
-worker/index.ts
-wrangler.jsonc
-```
+## Reproducible manual browser smoke test
 
-## Unverified and intentionally absent
+Use this for release verification and changes to routing, deployment tooling,
+or Cloudflare bindings. A permanent browser test dependency is not justified by
+this starter's single page and existing React/API coverage; reconsider Playwright
+when meaningful business workflows exist.
 
-- Cloudflare cloud upload, custom domains, account permissions, and deployment credentials were not tested. No production systems were accessed or modified.
-- GitHub Actions workflows were authored but have not executed on GitHub. Linux CI and the manual deployment workflow still need their first remote run.
-- This local Git repository has no configured GitHub remote. Publishing it and enabling GitHub's **Template repository** setting remain owner actions; the README documents them.
-- Authentication, authorization, persistence, backups, external integrations, and business features are intentionally absent. Applications handling protected information must add and validate their safeguards before production.
-- Production CSP must be reconsidered when adding components with inline styles or external resources. Node-only API unit tests do not replace runtime tests for future Cloudflare bindings.
-- The first frozen install reused the normal pnpm package cache; a network-cold installation and a live GitHub **Use this template** operation were not separately tested.
+1. Run `pnpm install --frozen-lockfile`, then `pnpm dev`. Open its printed local
+   URL in a browser. Confirm **Application ready**, **API connected**, the expected
+   application name, and a successful JSON `/api/health` request in Network tools.
+2. Navigate directly to `/missing`. Confirm **Page not found**, then click
+   **Return home**. Confirm the working home page returns through client routing
+   without a new document request.
+3. Navigate directly to `/api/health`, `/api`, and `/api/missing`. Confirm health
+   JSON 200 and unknown-route JSON 404 responses rather than the application page.
+4. Stop development, run `pnpm preview`, and repeat steps 1–3 at its printed URL.
+   Check Console/Network for script, asset, or CSP errors and verify static/API
+   headers. Stop preview afterward.
+5. After an authorized deployment, repeat steps 1–3 and the header/console checks
+   at the deployed HTTPS URL. Test any application-specific access controls too.
 
-The requested local template implementation and independent verification are complete. Remote publication, template metadata, CI execution, and cloud deployment remain unverified.
+This manual browser procedure was **not executed during this stabilization
+pass**. Earlier browser claims are not being carried forward as current evidence.
+
+## Remaining external actions and limitations
+
+1. Configure a GitHub rule for `main`: require pull requests and the **check** CI
+   status, block force pushes and deletion, and keep mandatory reviewer counts
+   optional for this small team. The current repository has no such rule.
+2. Create a `production` environment, select **Selected branches and tags**, and
+   allow the `main` branch only. Add scoped `CLOUDFLARE_API_TOKEN` and
+   `CLOUDFLARE_ACCOUNT_ID` environment secrets and optional reviewer approval.
+   The deployment job now has a `main` guard, but its changed workflow has only
+   been reviewed locally and has not executed on GitHub.
+3. Confirm CI for the published `main` commit. Use GitHub's
+   **Use this template → Create a new repository**
+   to create a private throwaway application, clone it, rename its metadata,
+   and repeat the frozen install, checks, development, and preview procedure.
+   Confirm its own GitHub/Cloudflare settings; template generation copies files,
+   not branch protection, environments, or secrets. Live generation is untested.
+4. With Cloudflare deployment authorization, choose a unique Worker name in the
+   generated application. Either run `pnpm exec wrangler login` and `pnpm deploy`,
+   or run the protected **Deploy** workflow from `main`. Run the browser smoke
+   procedure at the deployment URL. Cloud upload, account permissions, hosted
+   routing, deployment credentials, and custom domains remain untested.
+
+A network-cold dependency installation was not performed. Browser/server
+environment isolation was reviewed through the separate TypeScript configurations,
+ESLint import boundaries, example files, and source; no application environment
+variables were needed or injected. Node/jsdom tests and local workerd cannot
+verify future bindings or application security controls. Authentication,
+authorization, data storage, monitoring, and recovery remain application-specific;
+follow [the production security checklist](security.md) before using private data.
+
+**Release recommendation: Ready after external verification.** Local mandatory
+checks and independent application runtime checks pass. Apply GitHub protections,
+verify live template generation and Cloudflare deployment, and complete the
+browser smoke procedure before declaring the release externally verified.

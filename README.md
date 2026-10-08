@@ -44,11 +44,13 @@ Direct dependencies are pinned; commit `pnpm-lock.yaml` when updating them. Type
    | `src/routes/root.tsx` | visible application name                   |
    | `README.md`           | project-specific purpose and setup notes   |
 
-   Run `pnpm install` after changing package metadata and commit any lockfile changes. No renaming script is needed.
+   Run `pnpm install` after changing package metadata and commit any lockfile changes. Run `pnpm format` after renaming to keep metadata and source formatting valid. No renaming script is needed.
+
+   Configure your new repository's own branch protection, `production` environment, Cloudflare account, secrets, and any required bindings. GitHub template generation copies files, not those repository settings. If you change the default branch from `main`, update both workflows' branch restrictions. Adapt the template's verification report to your application rather than treating its results as evidence for new features.
 
 6. Run `pnpm check`, then start adding your application's features.
 
-To publish this repository as the original template, push it to GitHub and enable **Settings → General → Template repository**. Set `main` as the default branch and make the CI check required for pull requests. GitHub template status is repository metadata, not a setting in these files.
+The original repository has GitHub's **Template repository** setting enabled. For another template repository, enable **Settings → General → Template repository** explicitly; repository files do not control it. Set `main` as the default branch. Recommended branch protection: require pull requests and the **check** CI status, block force pushes and branch deletion, and leave mandatory reviewer counts optional for the small team. Require approvals for sensitive application changes as your team grows.
 
 ## Commands
 
@@ -103,6 +105,8 @@ API responses and static assets receive separate security headers because Cloudf
 
 **This unauthenticated starter must not store protected client information.** Before handling such information, implement authentication, server-side authorization, input validation, suitable redacted logging, backup/restore procedures, and application-specific security validation. Transport headers alone do not provide those safeguards.
 
+Use the [production security checklist](docs/security.md) before processing private business information. Coding agents should follow [AGENTS.md](AGENTS.md); dependency maintenance is described in [conventions](docs/conventions.md).
+
 ## Deploy to Cloudflare Workers
 
 Cloud deployment is separate from local setup and requires your own Cloudflare account. Update the Worker name first.
@@ -116,6 +120,6 @@ pnpm deploy
 
 The Cloudflare Vite plugin writes client assets and a Worker configuration during the build; Wrangler uses its generated deployment configuration. Do not manually deploy only `dist/client` or add a second frontend deployment. Verify `/`, an unknown client route, `/api/health`, and an unknown API route at the printed deployment URL.
 
-For GitHub Actions, create a **production** environment, configure its allowed branches and any desired reviewer protection, and add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as environment secrets. Scope the token to the target account and the Worker deployment permissions. Then explicitly run the **Deploy** workflow from the selected commit. It audits dependencies and runs `pnpm deploy`, including every mandatory check, before uploading. CI runs on pull requests and pushes to `main` without deployment secrets; pushes do not deploy automatically.
+For GitHub Actions, create a **production** environment, select **Selected branches and tags**, and allow the `main` branch only, with any desired reviewer protection. Add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as environment secrets. Scope the token to the target account and the Worker deployment permissions. Then explicitly run the **Deploy** workflow from `main`. Its job also rejects other branches, audits dependencies, and runs `pnpm deploy`, including every mandatory check, before uploading. CI runs on pull requests and pushes to `main` without deployment secrets; pushes do not deploy automatically. The workflow guard complements branch protection and environment restrictions; configure both before production use.
 
 See [architecture](docs/architecture.md), [conventions](docs/conventions.md), and the [verification report](docs/verification.md).

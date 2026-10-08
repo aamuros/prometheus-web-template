@@ -33,3 +33,24 @@ Use the pinned pnpm version and commit the lockfile. CI installs with `--frozen-
 Add a library only for a current requirement. Read its official documentation, check Node/Worker compatibility and peer requirements, and pin the tested version. Use `pnpm audit` when adding or updating dependencies. CI fails on high or critical advisories. Currently `sharp` is overridden to 0.35.5 to fix a vulnerability in Cloudflare development tooling; remove the override when upstream resolves a patched version and verification remains clean.
 
 When upgrading Node, TypeScript, Vite, Cloudflare tooling, or test infrastructure, run all checks and local preview from a clean install. In particular, do not upgrade TypeScript beyond the range supported by TypeScript ESLint. Update the compatibility date deliberately and verify runtime changes. Keep business features separate from foundation changes, avoid opportunistic refactoring, and document decisions only when their rationale will help future maintainers.
+
+## Dependency update process
+
+- Review updates monthly; investigate high/critical security advisories promptly
+  and resolve them before release. Use `pnpm outdated` and
+  `pnpm audit --audit-level=high` to identify specific work.
+- Update a small related set on a dedicated branch with
+  `pnpm add --save-exact <package>@<version>` (add `-D` for development tooling).
+  Review changelogs, peer requirements, Worker compatibility, lockfile changes,
+  and any new build scripts. Avoid blanket upgrades.
+- Check whether an override's parent dependency now accepts a patched version.
+  Remove an obsolete override, regenerate the lockfile, and audit again. The
+  current Miniflare version pins `sharp` to `0.35.4`, so the `0.35.5` override
+  remains necessary.
+- Run a frozen clean install, `pnpm check`, and the audit. For runtime or build
+  tooling updates, also run the local preview smoke procedure in
+  [verification](verification.md). Commit package metadata and the lockfile
+  together and review the CI result before merging.
+- Review pinned GitHub Action SHAs during the same maintenance window. Pin
+  reviewed replacements to full commit SHAs and verify their CI run. No automatic
+  dependency-update service is required for the base template.
