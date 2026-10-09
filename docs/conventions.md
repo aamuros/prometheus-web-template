@@ -2,15 +2,15 @@
 
 ## Names and ownership
 
-Use kebab-case file names, PascalCase React components and types, and camelCase functions and variables. Name features for the application's domain rather than generic architectural layers. Route files compose features; shared components and utilities must have demonstrated reuse. Keep related functionality together and prefer direct imports over barrel files.
+Use kebab-case file names, PascalCase React components and types, and camelCase functions and variables. Name features for business capabilities rather than generic architectural layers. Keep related functionality together. A feature's `index.ts` is its explicit public interface: outside consumers import it; internal files import each other directly. Avoid other barrels and wildcard public re-exports. See [feature organization](architecture.md#feature-organization) for ownership and dependency rules.
 
-`src/` owns browser behavior, `server/` owns server behavior, and `shared/` owns small environment-independent contracts. Do not import server code into frontend modules, even to reuse configuration. The `@/` alias always refers to `src/`; shared contracts use an explicit relative import.
+`src/` owns browser behavior, `server/` owns server behavior, and `shared/` owns small environment-independent contracts. Browser and server code must not import each other. Shared contracts depend only on other shared contracts, with no external packages. The `@/` alias always refers to `src/`; shared contracts use an explicit relative import. Use literal import paths so lint can check boundaries. Shared components and utilities must not import features.
 
 ## TypeScript and API patterns
 
 Keep strict checks enabled. Use `unknown` for external data and narrow or validate it; avoid unchecked `as` casts, `any`, and non-null assertions. Prefer functions and explicit types at public boundaries. Use `import type` for type-only dependencies. Library declarations use `skipLibCheck`; application code remains fully checked in separate frontend, server, and tooling passes.
 
-Use resource-oriented `/api/<resource>` URLs and normal HTTP verbs. Keep handlers thin and return JSON with accurate status codes. Successful response shapes may be resource-specific; errors use `{ error: string }`. Never include secrets, raw provider errors, or stack traces in responses. Throw `HTTPException` only with an intentional status; its message is not exposed by the global handler. Add explicit method handling where a route needs a 405 response and `Allow` header.
+Use resource-oriented `/api/<resource>` URLs and normal HTTP verbs. Keep handlers in feature `routes.ts`: validate input, enforce access, call business functions, and map results to JSON with accurate status codes. Business functions must not accept Hono contexts or Request/Response objects, return HTTP responses, or throw `HTTPException`. Use explicit inputs and return values or domain errors; translate them in routes. Successful response shapes may be resource-specific; errors use `{ error: string }`. Never include secrets, raw provider errors, or stack traces in responses. Throw `HTTPException` only in the HTTP layer with an intentional status; its message is not exposed by the global handler. Add explicit method handling where a route needs a 405 response and `Allow` header.
 
 Validate request data on the server and enforce authorization there when access control is added. Do not rely on frontend validation or shared TypeScript types for security. No global CORS middleware is needed for same-origin requests.
 
@@ -22,7 +22,7 @@ Request logs are intentionally minimal. Never log credentials, authorization hea
 
 ## Testing and verification
 
-Run the smallest relevant check while working, then `pnpm check` before merging or deploying. Add tests for meaningful business behavior, failure paths, permissions, and regressions. Prefer accessible queries in frontend tests; API tests should assert status, payload, and relevant headers. Keep the base tests independent of databases and external accounts.
+Run the smallest relevant check while working, then `pnpm check` before merging or deploying. Add tests for meaningful business behavior, failure paths, permissions, and regressions. Keep tests in `tests/`; they may import feature internals. Test business functions directly with explicit inputs and substituted external dependencies where needed. Prefer accessible queries in frontend tests; API tests should assert status, payload, and relevant headers through Hono or the fetch entry point. Keep the base tests independent of databases and external accounts. `tests/architecture.test.ts` verifies boundary enforcement against the actual ESLint configuration without adding example features.
 
 Vitest uses Node for Hono and jsdom for frontend tests. These verify handlers and React behavior, not Vercel CDN routing. After changing deployment configuration or adding runtime-specific integrations, run `pnpm preview` and check the complete flow in the local Node.js runtime. Browser/E2E tooling is optional and should be added when real workflows justify it.
 
