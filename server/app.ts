@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { secureHeaders } from 'hono/secure-headers';
-import type { ApiError, HealthResponse } from '../shared/api';
+import type { ApiError, HealthResponse } from '../shared/api.ts';
 
 export const app = new Hono();
 

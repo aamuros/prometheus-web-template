@@ -1,8 +1,7 @@
 node_modules/
 dist/
 coverage/
-.wrangler/
+.vercel/
 pnpm-lock.yaml
 output/
 .playwright-cli/
-public/_headers
