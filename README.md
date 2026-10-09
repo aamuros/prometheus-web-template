@@ -56,7 +56,7 @@ For a template repository, enable **Settings → General → Template repository
 | `pnpm dev`                      | Vite frontend and Hono API on one local origin             |
 | `pnpm build`                    | Production frontend assets in `dist/`                      |
 | `pnpm typecheck`                | Check frontend, server/function, and tooling separately    |
-| `pnpm lint`                     | ESLint, including frontend/server import boundaries        |
+| `pnpm lint`                     | ESLint, including runtime and feature import boundaries    |
 | `pnpm format:check`             | Verify formatting                                          |
 | `pnpm format`                   | Apply formatting                                           |
 | `pnpm test`                     | Run existing frontend and Hono tests plus function tests   |
@@ -83,11 +83,12 @@ api/index.ts      Vercel Web Standard fetch entry point
 vercel.json       Build settings, API/SPA routing, static security headers
 vite.config.ts    Frontend tooling and local API middleware
 tests/            Frontend smoke, API, and function tests
+tools/            Local ESLint boundary rule
 docs/             Architecture, conventions, and verification
 .github/workflows/ CI and manually triggered deployment
 ```
 
-Create `src/features/<feature>/` and `server/features/<feature>/` when a business feature needs them. Mount server routes from `server/app.ts`. Keep business logic outside `api/`: Vercel treats files there as function entry points. Empty feature directories and unused infrastructure configuration are omitted.
+Create `src/features/<feature>/` or `server/features/<feature>/` when a business feature needs them. Each feature exposes an explicit `index.ts`; outside consumers use that public interface. Mount public server routers from `server/app.ts`, keep HTTP adaptation in feature `routes.ts`, and test business functions directly. ESLint checks runtime boundaries and feature imports. Keep business logic outside `api/`: Vercel treats files there as function entry points. Empty feature directories and unused infrastructure configuration are omitted. See [feature organization](docs/architecture.md#feature-organization) for the dependency rules.
 
 ## Environment and security
 

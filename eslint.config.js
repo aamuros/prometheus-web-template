@@ -3,6 +3,7 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
+import { boundaries } from './tools/eslint-boundaries.ts';
 
 export default defineConfig([
   globalIgnores([
@@ -15,20 +16,11 @@ export default defineConfig([
   {
     files: ['**/*.{ts,tsx}'],
     extends: [js.configs.recommended, tseslint.configs.recommended],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['**/server/**', '**/api/**'],
-              message:
-                'Browser code may share contracts, never server runtime code.',
-            },
-          ],
-        },
-      ],
-    },
+  },
+  {
+    files: ['{src,server,api,shared}/**/*.{ts,tsx}'],
+    plugins: { architecture: { rules: { boundaries } } },
+    rules: { 'architecture/boundaries': 'error' },
   },
   {
     files: ['src/**/*.{ts,tsx}'],
@@ -39,14 +31,5 @@ export default defineConfig([
         { allowConstantExport: true, allowExportNames: ['Route'] },
       ],
     },
-  },
-  {
-    files: [
-      'api/**/*.ts',
-      'server/**/*.ts',
-      '*config.ts',
-      'tests/**/*.{ts,tsx}',
-    ],
-    rules: { 'no-restricted-imports': 'off' },
   },
 ]);

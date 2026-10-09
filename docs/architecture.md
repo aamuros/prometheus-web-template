@@ -10,7 +10,9 @@ This is a feature-oriented modular monolith: one React SPA and one Hono API, dep
 
 ## Frontend/backend boundary
 
-`src/` runs in the browser; `server/` runs on the server. Separate TypeScript configurations keep browser globals and Node.js runtime globals distinct. ESLint rejects imports from server files into browser code. `shared/api.ts` contains only runtime-independent contracts, and consumers use type-only imports. Do not put credentials, database clients, or server configuration in shared modules.
+`src/` runs in the browser; `server/` runs on the server. Separate TypeScript configurations keep browser globals and Node.js runtime globals distinct. ESLint rejects imports in both directions, including type-only imports, and keeps Node.js modules out of browser code. `api/` is only the Vercel entry layer: it may import server code; server modules must not import it. Application code must not import tests or tooling.
+
+`shared/` contains runtime-independent request/response contracts, grouped by feature when needed. It may depend only on other shared files, with no external packages, UI, business implementation, credentials, or server configuration. Consumers use type-only imports for types. Do not share server domain models automatically: publish only the data needed across the HTTP boundary.
 
 The health request uses same-origin `fetch` and checks the small response shape at runtime. TypeScript contracts do not validate untrusted input. A Hono RPC client or schema validation can be added when a larger API warrants it; the base does not need either abstraction. No CORS policy is needed for this same-origin application; do not add permissive CORS by default.
 
@@ -24,9 +26,33 @@ Tailwind 4 uses its Vite plugin and CSS-first `@theme` configuration. `component
 
 ## Feature organization
 
-When a feature is introduced, place its UI, hooks, and browser helpers in `src/features/<feature>/`. Keep route files focused on navigation and composition. Place its Hono routes and warranted business logic in `server/features/<feature>/`, mounted from `server/app.ts` with a clear `/api/<resource>` prefix. Add tests close to the established `tests/` organization until colocating feature tests becomes useful.
+Name features for business capabilities, using the same name across runtimes when both exist. A feature owns its UI, API behavior, business rules, and tests. Create `src/features/<feature>/` or `server/features/<feature>/` only when needed; a feature does not require both. Keep related changes within that owner instead of spreading business code across global controller/service/model folders.
 
-Handlers should parse/validate input, enforce access, invoke business logic, and translate results into HTTP responses. Extract functions or services when the logic benefits from independent tests or reuse. Add repositories only when persistence access genuinely needs an abstraction. Do not introduce layers, dependency injection, or universal business models in advance.
+| Location                              | Responsibility                                                     |
+| ------------------------------------- | ------------------------------------------------------------------ |
+| `src/features/<feature>/`             | Feature UI, hooks, and browser API access                          |
+| `server/features/<feature>/routes.ts` | Hono router and HTTP adaptation                                    |
+| Other server feature files            | Plain business functions and needed external integrations          |
+| Feature `index.ts`                    | Small public interface with explicit named/type exports            |
+| `shared/<feature>.ts`                 | HTTP contracts, only when both runtimes need them                  |
+| `tests/`                              | Direct business tests, API/UI tests, and boundary regression tests |
+
+These are placement rules, not a scaffold. Choose implementation filenames that describe their purpose; do not create empty folders or placeholder services.
+
+### Public interfaces and dependencies
+
+- Every consumer outside a feature imports its `index.ts`, including application routes and other features. Export only intended UI, use cases, types, and the server router needed by composition. Do not expose implementation helpers or wildcard-export the whole feature.
+- Inside a feature, import sibling implementation files directly rather than importing its own public index. `index.ts` is the only warranted barrel.
+- Cross-feature imports use the other feature's public interface in the same runtime. Keep these dependencies intentional and acyclic; compose multi-feature flows in the caller that owns the business operation. Do not add a generic orchestration framework or event bus.
+- Frontend routes compose public feature UI; `server/app.ts` mounts public feature routers at `/api/<resource>`. Features must not import these composition files. Shared components and utilities must not depend on features; promote code only after reuse is demonstrated.
+
+ESLint's local rule in `tools/eslint-boundaries.ts` enforces runtime direction, public entry points, composition direction, and direct Hono imports in business files. It covers imports, re-exports, literal dynamic imports, `require`, and TypeScript import types. Use relative paths or `@/` (browser only); computed module paths are rejected. Tooling and tests can import both runtimes and feature internals. No feature registry, boundary library, or dependency graph service is required. Review dependency cycles, public export selection, and transitive HTTP coupling in code review; lint does not prove their absence.
+
+### HTTP and business logic
+
+Feature `routes.ts` parses and validates input, enforces authorization when needed, invokes business functions, and translates results/errors into HTTP. Business functions accept explicit values and return values or domain errors. They must not use Hono contexts, Request/Response objects, status codes, or `HTTPException`. Keep Hono imports in `routes.ts` and the public `index.ts`. Pass external dependencies as function parameters when substitution is needed for tests; do not introduce a service container or interface for every function.
+
+Test business rules directly, without constructing HTTP requests. Test validation, authorization, error mapping, status codes, and response headers through Hono `app.request` or the fetch entry point. Keep the existing Vitest Node/jsdom setup and credential-free base tests. The health endpoint is a trivial platform route, so it stays in `server/app.ts`; extracting a health service would add indirection without independent behavior. Add persistence adapters only for a real persistence requirement.
 
 ## API and security defaults
 
@@ -34,23 +60,13 @@ Hono returns JSON, a minimal uncached health response, 404 for unknown routes, 4
 
 API headers are set in Hono; `vercel.json` covers static responses and client-route fallbacks while excluding `/api` and `/api/*`. Local preview reads those static headers from the same configuration. Explicit API routing preserves Hono's stricter API CSP, uncached responses, and safe error envelopes. Same-origin requests avoid unnecessary CORS middleware. Vercel selects Node.js 24 from `package.json`; it manages runtime patch versions independently of the pinned local version.
 
-## Optional integrations
+## Complexity and future integrations
 
-Install and configure approved technologies in the generated application, following their official documentation and current Node.js/Vercel guidance. No installer system or unused configuration is provided.
+The runtime already has one app, explicit route assembly, plain functions, and no unused business layers. Keep them. Separate browser/server/tooling typechecks and the local Vite API adapter support real runtime boundaries and same-origin development; they are not separate applications. The public feature index is a deliberate exception to avoiding barrels: it defines ownership without introducing packages or a registry.
 
-| Need                        | Approved approach and considerations                                                                                                                                                           |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Server state                | TanStack Query; use query keys, invalidation, and loader integration deliberately.                                                                                                             |
-| Forms and validation        | React Hook Form and Zod when warranted; validate again on the server.                                                                                                                          |
-| Relational storage          | PostgreSQL, Drizzle ORM/Kit, and Neon; choose a serverless-compatible connection strategy or pool, define migrations, and protect credentials. Keep migrations separate from request handling. |
-| Authentication              | Better Auth; confirm its Node.js runtime and database adapter requirements, use secure server-managed sessions, and plan CSRF/session handling.                                                |
-| Authorization               | Enforce permissions in every relevant API operation; hiding UI controls is insufficient. Add application-specific RBAC only when needed.                                                       |
-| Files                       | An appropriate object storage provider; validate uploads and enforce access before issuing URLs or returning objects.                                                                          |
-| Background work             | Vercel Cron or an appropriate queue provider; add handlers, retry and idempotency behavior when a real job exists.                                                                             |
-| Browser regression coverage | Playwright when meaningful user workflows exist; keep unit tests credential-free.                                                                                                              |
-| Observability and email     | Sentry and an appropriate email provider; redact protected data, keep keys server-side, and assess operating cost.                                                                             |
+Do not add repositories, base services, dependency-injection containers, internal HTTP calls, event buses, schema libraries, or caching layers in anticipation of future features. Add an integration only for a current application requirement, inside the owning server feature when appropriate, and verify its Node.js/Vercel compatibility. Database and authentication infrastructure belong in the generated application when required, not in this template.
 
-Applications handling protected information also need suitable logging, backups with tested restore, security validation, and a deployment access model. These are application-specific requirements, not capabilities supplied by this unauthenticated template.
+Applications handling protected information also need the safeguards in [the production checklist](security.md). These are application-specific requirements, not capabilities supplied by this unauthenticated template.
 
 ## Official guidance checked
 
