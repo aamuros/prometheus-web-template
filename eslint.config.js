@@ -8,7 +8,7 @@ export default defineConfig([
   globalIgnores([
     'dist/**',
     'coverage/**',
-    '.wrangler/**',
+    '.vercel/**',
     'output/**',
     '.playwright-cli/**',
   ]),
@@ -21,9 +21,9 @@ export default defineConfig([
         {
           patterns: [
             {
-              group: ['**/worker/**'],
+              group: ['**/server/**', '**/api/**'],
               message:
-                'Browser code may share contracts, never Worker runtime code.',
+                'Browser code may share contracts, never server runtime code.',
             },
           ],
         },
@@ -41,7 +41,12 @@ export default defineConfig([
     },
   },
   {
-    files: ['worker/**/*.ts', 'tests/**/*.ts', 'tests/**/*.tsx'],
+    files: [
+      'api/**/*.ts',
+      'server/**/*.ts',
+      '*config.ts',
+      'tests/**/*.{ts,tsx}',
+    ],
     rules: { 'no-restricted-imports': 'off' },
   },
 ]);

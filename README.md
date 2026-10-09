@@ -1,18 +1,18 @@
 # Web Application Template
 
-A standalone GitHub repository template for internal business applications. React and Hono ship together on Cloudflare Workers. Each generated repository owns its code, dependencies, infrastructure, and deployment; it has no runtime connection to this template.
+A standalone GitHub repository template for business applications. React and Hono ship together in one Vercel project. Each generated repository owns its code, dependencies, infrastructure, and deployment; it has no runtime connection to this template.
 
 The starting application contains one home page, client routing and error handling, and `GET /api/health`. No database, authentication, or business features are installed.
 
 ## Stack and requirements
 
 - React 19, Vite, TanStack Router, strict TypeScript
-- Hono on Cloudflare Workers with the official Cloudflare Vite plugin
+- Hono in a Node.js Vercel Function
 - Tailwind CSS 4 and shadcn/ui configuration, tokens, and class utilities
 - Vitest, Testing Library, ESLint, Prettier, GitHub Actions
 - Node.js 24.19.0 (see `.node-version`) and pnpm 12.10.1 (see `packageManager`)
 
-Direct dependencies are pinned; commit `pnpm-lock.yaml` when updating them. TypeScript 6 is retained because the pinned TypeScript ESLint tooling does not support TypeScript 7 yet.
+Direct dependencies are pinned; commit `pnpm-lock.yaml` when updating them. TypeScript 6 is retained because the pinned TypeScript ESLint tooling does not support TypeScript 7 yet. Vercel selects Node.js 24 from `package.json` and manages its runtime patch version.
 
 ## Create a project
 
@@ -32,44 +32,41 @@ Direct dependencies are pinned; commit `pnpm-lock.yaml` when updating them. Type
    pnpm dev
    ```
 
-   Open the local URL printed by Vite (normally `http://127.0.0.1:5173`). The home page should show **Application ready** and **API connected**. `/api/health` returns `{"status":"ok"}`. No external credentials or environment files are required.
+   Open the local URL printed by Vite (normally `http://127.0.0.1:5173`). The home page should show **Application ready** and **API connected**. `/api/health` returns `{"status":"ok"}`. The frontend and API share one origin, with server reloads and React refresh. No external credentials or environment files are required.
 
 5. Rename the following metadata before deploying:
 
-   | File                  | Update                                     |
-   | --------------------- | ------------------------------------------ |
-   | `package.json`        | `name` and `description`                   |
-   | `wrangler.jsonc`      | `name`, unique for your Cloudflare account |
-   | `index.html`          | page title and description                 |
-   | `src/routes/root.tsx` | visible application name                   |
-   | `README.md`           | project-specific purpose and setup notes   |
+   | File                  | Update                                   |
+   | --------------------- | ---------------------------------------- |
+   | `package.json`        | `name` and `description`                 |
+   | `index.html`          | page title and description               |
+   | `src/routes/root.tsx` | visible application name                 |
+   | `README.md`           | project-specific purpose and setup notes |
 
-   Run `pnpm install` after changing package metadata and commit any lockfile changes. Run `pnpm format` after renaming to keep metadata and source formatting valid. No renaming script is needed.
-
-   Configure your new repository's own branch protection, `production` environment, Cloudflare account, secrets, and any required bindings. GitHub template generation copies files, not those repository settings. If you change the default branch from `main`, update both workflows' branch restrictions. Adapt the template's verification report to your application rather than treating its results as evidence for new features.
+   Run `pnpm install` after changing package metadata and commit any lockfile changes. Run `pnpm format` after renaming. Configure the new repository's own branch protection, GitHub `production` environment, Vercel project, and optional integrations. Template generation copies files, not account settings. If your default branch is not `main`, update both workflows. Adapt the verification report to your application.
 
 6. Run `pnpm check`, then start adding your application's features.
 
-The original repository has GitHub's **Template repository** setting enabled. For another template repository, enable **Settings → General → Template repository** explicitly; repository files do not control it. Set `main` as the default branch. Recommended branch protection: require pull requests and the **check** CI status, block force pushes and branch deletion, and leave mandatory reviewer counts optional for the small team. Require approvals for sensitive application changes as your team grows.
+For a template repository, enable **Settings → General → Template repository** explicitly. Recommended branch protection: require pull requests and the **check** CI status, block force pushes and branch deletion, and require approvals appropriate to your team's access model.
 
 ## Commands
 
-| Command                         | Purpose                                                         |
-| ------------------------------- | --------------------------------------------------------------- |
-| `pnpm dev`                      | React development server and local Workers runtime              |
-| `pnpm build`                    | Production client assets and Worker bundle                      |
-| `pnpm typecheck`                | Check frontend, Worker, and tooling separately                  |
-| `pnpm lint`                     | ESLint, including frontend/Worker import boundaries             |
-| `pnpm format:check`             | Verify formatting                                               |
-| `pnpm format`                   | Apply formatting                                                |
-| `pnpm test`                     | Run frontend smoke tests and Hono API tests once                |
-| `pnpm test:watch`               | Watch unit tests                                                |
-| `pnpm check`                    | Typecheck, lint, formatting, tests, and production build        |
-| `pnpm preview`                  | Rebuild and run the production application locally with workerd |
-| `pnpm audit --audit-level=high` | Review dependency vulnerabilities                               |
-| `pnpm deploy`                   | Run all checks, build, and deploy with Wrangler                 |
+| Command                         | Purpose                                                    |
+| ------------------------------- | ---------------------------------------------------------- |
+| `pnpm dev`                      | Vite frontend and Hono API on one local origin             |
+| `pnpm build`                    | Production frontend assets in `dist/`                      |
+| `pnpm typecheck`                | Check frontend, server/function, and tooling separately    |
+| `pnpm lint`                     | ESLint, including frontend/server import boundaries        |
+| `pnpm format:check`             | Verify formatting                                          |
+| `pnpm format`                   | Apply formatting                                           |
+| `pnpm test`                     | Run existing frontend and Hono tests plus function tests   |
+| `pnpm test:watch`               | Watch unit tests                                           |
+| `pnpm check`                    | Typecheck, lint, formatting, tests, and production build   |
+| `pnpm preview`                  | Rebuild and serve frontend assets and API locally          |
+| `pnpm audit --audit-level=high` | Review dependency vulnerabilities                          |
+| `pnpm deploy`                   | Run checks and deploy production through pinned Vercel CLI |
 
-`pnpm preview` needs no Cloudflare credentials. It is a local preview, not a public deployment. Unit tests use Node and jsdom; they do not start a browser or require external services.
+`pnpm preview` needs no credentials. It runs the API in local Node.js and applies the static production headers from `vercel.json`. It does not emulate Vercel's CDN rewrites or function packaging. Unit tests use Node and jsdom and need no external services. Vercel bundles `api/index.ts` and its server imports separately during deployment; `pnpm build` builds the SPA only.
 
 ## Structure
 
@@ -81,45 +78,46 @@ src/
   lib/            Browser API access and UI class utility
   styles/         Tailwind and shared design tokens
 shared/api.ts     Runtime-independent response contracts
-worker/
-  app.ts          Hono middleware and routes
-  index.ts        Cloudflare Worker entry point
-public/_headers   Production static-asset security headers
-tests/            Frontend smoke tests and API tests
+server/app.ts     Hono middleware and routes
+api/index.ts      Vercel Web Standard fetch entry point
+vercel.json       Build settings, API/SPA routing, static security headers
+vite.config.ts    Frontend tooling and local API middleware
+tests/            Frontend smoke, API, and function tests
 docs/             Architecture, conventions, and verification
 .github/workflows/ CI and manually triggered deployment
 ```
 
-Create `src/features/<feature>/` and `worker/features/<feature>/` when a business feature needs them. Empty feature directories and unused infrastructure configuration are deliberately omitted.
+Create `src/features/<feature>/` and `server/features/<feature>/` when a business feature needs them. Mount server routes from `server/app.ts`. Keep business logic outside `api/`: Vercel treats files there as function entry points. Empty feature directories and unused infrastructure configuration are omitted.
 
 ## Environment and security
 
-The base needs no environment variables. `.env.example` and `.dev.vars.example` explain the boundary without adding unused values:
+The base needs no environment variables. `.env.example` explains the boundary:
 
-- `VITE_*` variables are public and embedded in the browser bundle. Never use them for secrets.
-- Local Worker secrets belong in `.dev.vars`, which Git ignores. Read them through typed Worker bindings, not browser imports.
-- Use `pnpm exec wrangler secret put <NAME>` for production secrets. Configure non-secret bindings in `wrangler.jsonc` only when needed. Add matching binding types when you add infrastructure.
+- `VITE_*` values are public and embedded in the browser bundle. Never use them for secrets.
+- Optional local server secrets belong in ignored `.env.local`; Vite's configuration loads them into Node's `process.env`. Server code reads them there, never through browser imports or shared modules. Existing environment values take precedence.
+- Configure hosted server secrets in the Vercel project's **Environment Variables**, scoped to Development, Preview, or Production as appropriate. Redeploy after changing them.
 - CI deployment credentials belong in GitHub environment secrets, not repository files.
 
-API responses and static assets receive separate security headers because Cloudflare serves assets without invoking Hono. The production CSP allows same-origin resources and blocks inline scripts/styles; evaluate and adjust it deliberately when integrating components that use inline styles or external services. Vite development uses its development headers so React refresh and CSS updates can work.
+API responses receive Hono's security headers. Static assets and SPA fallbacks receive the headers in `vercel.json`, which exclude API URLs to preserve their stricter CSP. The SPA's production CSP allows same-origin resources and blocks inline scripts/styles; evaluate it when integrating components or external services. Development omits the static production CSP so React refresh and CSS updates work.
 
-**This unauthenticated starter must not store protected client information.** Before handling such information, implement authentication, server-side authorization, input validation, suitable redacted logging, backup/restore procedures, and application-specific security validation. Transport headers alone do not provide those safeguards.
+**This unauthenticated starter must not store protected client information.** Before handling such information, implement authentication, server-side authorization, input validation, redacted logging, backup/restore procedures, and application-specific security validation. Use the [production security checklist](docs/security.md).
 
-Use the [production security checklist](docs/security.md) before processing private business information. Coding agents should follow [AGENTS.md](AGENTS.md); dependency maintenance is described in [conventions](docs/conventions.md).
+## Deploy to Vercel
 
-## Deploy to Cloudflare Workers
-
-Cloud deployment is separate from local setup and requires your own Cloudflare account. Update the Worker name first.
+Create your own Vercel project with the **Vite** preset and this repository as its root. `vercel.json` builds `dist/`, deploys the Hono entry as a Node.js Function, reserves `/api` and `/api/*` for JSON responses, and provides SPA deep-link fallbacks on the same domain. Database and authentication setup are optional and belong in the generated application.
 
 For an authorized manual deployment:
 
 ```sh
-pnpm exec wrangler login
+pnpm dlx vercel@63.1.0 login
+pnpm dlx vercel@63.1.0 link
 pnpm deploy
 ```
 
-The Cloudflare Vite plugin writes client assets and a Worker configuration during the build; Wrangler uses its generated deployment configuration. Do not manually deploy only `dist/client` or add a second frontend deployment. Verify `/`, an unknown client route, `/api/health`, and an unknown API route at the printed deployment URL.
+To validate Vercel packaging locally after linking, run `pnpm dlx vercel@63.1.0 pull --environment=production`, then `pnpm dlx vercel@63.1.0 build --prod`. This contacts Vercel and requires your account. An optional `pnpm dlx vercel@63.1.0 dev` preview exercises platform routing; the default `pnpm dev` stays account-free.
 
-For GitHub Actions, create a **production** environment, select **Selected branches and tags**, and allow the `main` branch only, with any desired reviewer protection. Add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as environment secrets. Scope the token to the target account and the Worker deployment permissions. Then explicitly run the **Deploy** workflow from `main`. Its job also rejects other branches, audits dependencies, and runs `pnpm deploy`, including every mandatory check, before uploading. CI runs on pull requests and pushes to `main` without deployment secrets; pushes do not deploy automatically. The workflow guard complements branch protection and environment restrictions; configure both before production use.
+The included **Deploy** workflow is manually triggered and allows only `main`. Configure a GitHub **production** environment with **Selected branches and tags → main**, and any required reviewers. Add `VERCEL_TOKEN` as an environment secret and `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` as environment variables (IDs are available in the linked project's ignored `.vercel/project.json`). The workflow installs with the frozen lockfile, audits, checks, pulls production configuration, builds Vercel output, and uploads it with `--prebuilt --prod`. CI runs without deployment secrets on pull requests and pushes to `main`.
 
-See [architecture](docs/architecture.md), [conventions](docs/conventions.md), and the [verification report](docs/verification.md).
+If you connect Vercel's Git integration, pushes may automatically deploy previews and production independently of this manual workflow. Choose one release policy deliberately; configure Deployment Checks when CI must gate Git deployments. Verify `/`, a nested client URL, `/api/health`, `/api`, and an unknown API URL at the hosted HTTPS domain before relying on the release.
+
+See [architecture](docs/architecture.md), [conventions](docs/conventions.md), [AGENTS.md](AGENTS.md), and the [verification report](docs/verification.md).

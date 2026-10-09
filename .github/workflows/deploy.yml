@@ -20,7 +20,8 @@ jobs:
     timeout-minutes: 15
     environment: production
     env:
-      WRANGLER_SEND_METRICS: 'false'
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -32,7 +33,14 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm audit --audit-level=high
-      - run: pnpm deploy
+      - run: pnpm check
+      - name: Pull production configuration
+        run: pnpm dlx vercel@63.1.0 pull --yes --environment=production
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Build Vercel output
+        run: pnpm dlx vercel@63.1.0 build --prod
+      - name: Deploy production output
+        run: pnpm dlx vercel@63.1.0 deploy --prebuilt --prod
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
